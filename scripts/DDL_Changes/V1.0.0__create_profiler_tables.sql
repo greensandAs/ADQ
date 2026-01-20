@@ -1,9 +1,7 @@
 --- Set the context (Assuming this is run after an 'Always' script sets the default context)
-CREATE DATABASE {{ snowflake_database }};
+USE DATABASE {{ snowflake_database }};
 
 CREATE SCHEMA {{ snowflake_schema }};
-
-USE DATABASE {{ snowflake_database }};
 
 USE SCHEMA {{ snowflake_schema }};
 
