@@ -48,7 +48,7 @@ jobs:
           # FIX 1: Map the secret to the specific variable name Schemachange expects
           SNOWFLAKE_PASSWORD: ${{ secrets.SF_PASSWORD }}
         run: |
-          DB_NAME=$(jq -r '.sf_database' config.json)
+          DB_NAME=$(jq -r '.snowflake_database' config.json)
           WH_NAME=$(jq -r '.sf_warehouse' config.json)
           ROLE_NAME=$(jq -r '.sf_role' config.json)
           VARS_JSON=$(cat config.json)
