@@ -1,6 +1,6 @@
 {
-  "sf_database": "DQ_FRAMEWORK",
+  "snowflake_database": "DQ_FRAMEWORK",
   "sf_warehouse": "COMPUTE_WH",
   "sf_role": "ACCOUNTADMIN",
-  "sf_schema": "METADATA"
+  "snowflake_schema": "METADATA"
 }
