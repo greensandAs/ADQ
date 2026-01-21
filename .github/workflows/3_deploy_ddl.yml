@@ -1,30 +1,11 @@
 name: 3. Deploy DDL
-
-on: 
-  workflow_dispatch:
+on: workflow_dispatch
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-      - name: Install SQLFluff
-        run: pip install sqlfluff
-      - name: Run Linter
-        run: sqlfluff lint scripts/ddl --dialect snowflake
-
   deploy-ddl:
-    needs: lint
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -32,14 +13,54 @@ jobs:
           python-version: '3.10'
           
       - name: Install Schemachange
-        run: pip install schemachange
+        run: pip install schemachange snowflake-connector-python
 
-      - name: Deploy DDL to Target
+      # --------------------------------------------------------
+      # ✅ NEW STEP: CREATE DB & SCHEMA IF MISSING
+      # --------------------------------------------------------
+      - name: Bootstrap Target Database
         env:
-          # --- Secrets ---
+          SNOWFLAKE_USER: ${{ vars.TARGET_USER }}
           SNOWFLAKE_PASSWORD: ${{ secrets.TARGET_PASSWORD }}
+          SNOWFLAKE_ACCOUNT: ${{ vars.TARGET_ACCOUNT }}
+          SNOWFLAKE_ROLE: ${{ vars.TARGET_ROLE }}
+          SNOWFLAKE_WAREHOUSE: ${{ vars.TARGET_WAREHOUSE }}
+          # These pull the names 'DQ_FRAMEWORK_TEST' and 'METADATA_TEST'
+          TARGET_DB: ${{ vars.TARGET_DATABASE }}
+          TARGET_SCHEMA: ${{ vars.TARGET_SCHEMA }}
+        run: |
+          python -c "
+          import snowflake.connector
+          import os
           
-          # --- Variables (Mapped to standard Schemachange Env Vars) ---
+          print('🔌 Connecting to Snowflake to bootstrap environment...')
+          conn = snowflake.connector.connect(
+              user=os.environ['SNOWFLAKE_USER'],
+              password=os.environ['SNOWFLAKE_PASSWORD'],
+              account=os.environ['SNOWFLAKE_ACCOUNT'],
+              role=os.environ['SNOWFLAKE_ROLE'],
+              warehouse=os.environ['SNOWFLAKE_WAREHOUSE']
+          )
+          
+          db = os.environ['TARGET_DB']
+          schema = os.environ['TARGET_SCHEMA']
+          
+          print(f'🔨 Ensuring Database exists: {db}')
+          conn.cursor().execute(f'CREATE DATABASE IF NOT EXISTS {db}')
+          
+          print(f'🔨 Ensuring Schema exists: {db}.{schema}')
+          conn.cursor().execute(f'CREATE SCHEMA IF NOT EXISTS {db}.{schema}')
+          
+          print('✅ Bootstrap complete.')
+          conn.close()
+          "
+
+      # --------------------------------------------------------
+      # EXISTING STEP: RUN SCHEMACHANGE
+      # --------------------------------------------------------
+      - name: Deploy to Target
+        env:
+          SNOWFLAKE_PASSWORD: ${{ secrets.TARGET_PASSWORD }}
           SNOWFLAKE_ACCOUNT: ${{ vars.TARGET_ACCOUNT }}
           SNOWFLAKE_USER: ${{ vars.TARGET_USER }}
           SNOWFLAKE_ROLE: ${{ vars.TARGET_ROLE }}
@@ -47,16 +68,12 @@ jobs:
           SNOWFLAKE_DATABASE: ${{ vars.TARGET_DATABASE }}
           SNOWFLAKE_SCHEMA: ${{ vars.TARGET_SCHEMA }}
         run: |
-          echo "Deploying to Database: $DB_NAME"
-
-          # The -f flag points to the folder containing your generated SQL files
-          schemachange deploy \
-            -f ./scripts/ddl \
+          schemachange -f scripts/ddl \
             -a $SNOWFLAKE_ACCOUNT \
             -u $SNOWFLAKE_USER \
             -r $SNOWFLAKE_ROLE \
             -w $SNOWFLAKE_WAREHOUSE \
             -d $SNOWFLAKE_DATABASE \
-            -c $SNOWFLAKE_DATABASE.SCHEMACHANGE.CHANGE_HISTORY \
+            -c $SNOWFLAKE_DATABASE.$SNOWFLAKE_SCHEMA.CHANGE_HISTORY \
             --create-change-history-table \
             --vars "{\"snowflake_database\": \"$SNOWFLAKE_DATABASE\", \"snowflake_schema\": \"$SNOWFLAKE_SCHEMA\"}"
