@@ -1,4 +1,8 @@
-USE SCHEMA {{ snowflake_schema }};
+USE DATABASE {{ snowflake_database }};
+
+ CREATE SCHEMA IF NOT EXISTS {{ snowflake_schema }};
+
+ USE SCHEMA {{ snowflake_schema }};
 
 -- Sequence: RUN_ID_SEQ
 create or replace sequence RUN_ID_SEQ start with 1 increment by 1 order;;

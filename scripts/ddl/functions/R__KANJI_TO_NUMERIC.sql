@@ -1,4 +1,6 @@
-USE SCHEMA {{ snowflake_schema }};
+USE DATABASE {{ snowflake_database }};
+
+ USE SCHEMA {{ snowflake_schema }};
 
 CREATE OR REPLACE FUNCTION "KANJI_TO_NUMERIC"("KJ_STR" VARCHAR)
 RETURNS FLOAT

@@ -1,4 +1,6 @@
-USE SCHEMA {{ snowflake_schema }};
+USE DATABASE {{ snowflake_database }};
+
+ USE SCHEMA {{ snowflake_schema }};
 
 create or replace view MICROSEGMENT_CONTEXT_ANOMALY(
 	KPI_ID,
