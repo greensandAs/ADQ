@@ -1,0 +1,31 @@
+[sqlfluff]
+# Set the SQL dialect to Snowflake for accurate parsing
+dialect = snowflake
+
+# Use the Jinja templater to process variables (e.g., {{ snowflake_database }})
+templater = jinja
+
+# Set the maximum allowed line length. 120 is common.
+max_line_length = 150
+
+# Setting to 0 disables the check that skips large files, resolving the ValueError
+large_file_skip_byte_limit = 0
+
+# Define file extensions to scan
+sql_file_exts = .sql
+
+# List the modern rule codes to enforce.
+# This includes fixes for indentation (LT02), spacing (LT01),
+# capitalization (CP01), missing semicolons (CV06), etc.
+rules = CV06, LT01, LT02, LT05, LT12, LT13, CP01, RF04
+exclude_rules = RF04
+
+
+[sqlfluff:indentation]
+# Set the desired indentation size
+tab_space_size = 4
+
+[sqlfluff:templater:jinja:context]
+# CRITICAL: Provide dummy values for Jinja variables so SQLFluff can render the code
+snowflake_database = "TEMP_DB"
+snowflake_schema = "TEMP_SCHEMA"
