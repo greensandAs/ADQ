@@ -25,6 +25,9 @@ exclude_rules = RF04
 # Set the desired indentation size
 tab_space_size = 4
 
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = upper
+
 [sqlfluff:templater:jinja:context]
 # CRITICAL: Provide dummy values for Jinja variables so SQLFluff can render the code
 snowflake_database = "TEMP_DB"
