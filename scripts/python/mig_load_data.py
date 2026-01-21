@@ -1,84 +1,107 @@
 import snowflake.connector
 import os
-import glob
 from config import TARGET_CONFIG, DATA_TABLES_TO_EXPORT, OUTPUT_DIR_DATA
 
-TARGET_STAGE = "DATA_LOAD_STAGE"
+# 1. Define Stage Paths
+# We use separate folders to track status
+STAGE_NAME = "MIGRATION_LOAD_STAGE"
+PATH_TODO = "not_processed"
+PATH_DONE = "processed"
 
-def main():
-    print(f"🔌 Connecting to TARGET for Data Load: {TARGET_CONFIG['account']}...")
-    conn = snowflake.connector.connect(
-        user=TARGET_CONFIG['user'], 
-        password=TARGET_CONFIG['password'], 
+def get_connection():
+    print(f"🔌 Connecting to TARGET: {TARGET_CONFIG['account']}...")
+    return snowflake.connector.connect(
+        user=TARGET_CONFIG['user'],
+        password=TARGET_CONFIG['password'],
         account=TARGET_CONFIG['account'],
-        warehouse=TARGET_CONFIG['warehouse'], 
-        database=TARGET_CONFIG['database'], 
-        schema=TARGET_CONFIG['schema'], 
+        warehouse=TARGET_CONFIG['warehouse'],
+        database=TARGET_CONFIG['database'],
+        schema=TARGET_CONFIG['schema'],
         role=TARGET_CONFIG['role']
     )
+
+def main():
+    conn = get_connection()
     cur = conn.cursor()
+    
+    # We need the absolute path for the PUT command
+    abs_path = os.path.abspath(OUTPUT_DIR_DATA)
 
     try:
         cur.execute(f"USE SCHEMA {TARGET_CONFIG['database']}.{TARGET_CONFIG['schema']}")
         
-        # 1. Create Stage (Persistent)
-        print(f"🔨 Ensuring Stage {TARGET_STAGE} exists...")
+        print("🔨 Creating Internal Stage...")
         cur.execute(f"""
-            CREATE STAGE IF NOT EXISTS {TARGET_STAGE} 
-            FILE_FORMAT=(TYPE='CSV' COMPRESSION='GZIP')
+            CREATE STAGE IF NOT EXISTS {STAGE_NAME} 
+            FILE_FORMAT=(TYPE='CSV' FIELD_OPTIONALLY_ENCLOSED_BY='"')
         """)
 
-        # 2. Find Exported Files
-        files = glob.glob(os.path.join(OUTPUT_DIR_DATA, "*.csv.gz"))
-        print(f"📂 Found {len(files)} files to process.")
-        
-        for filepath in files:
-            filename = os.path.basename(filepath)
-            # Infer table name from filename (e.g., 'DQ_RULE_CONFIG.csv.gz' -> 'DQ_RULE_CONFIG')
-            table_name = filename.replace(".csv.gz", "")
+        for table in DATA_TABLES_TO_EXPORT:
+            filename = f"{table}.csv.gz"
+            file_path_local = os.path.join(abs_path, filename)
             
-            if table_name not in DATA_TABLES_TO_EXPORT:
-                print(f"   ⚠️ Skipping {filename} (Not in config list)")
+            if not os.path.exists(file_path_local):
+                print(f"⚠️ Skipping {table}: File not found locally.")
                 continue
 
-            print(f"🚀 Processing {table_name}...")
+            print(f"\n📦 Processing Table: {table}")
+            
+            # ---------------------------------------------------------
+            # STEP 1: UPLOAD to 'not_processed' folder
+            # ---------------------------------------------------------
+            print(f"   ⬆️ Uploading to @{STAGE_NAME}/{PATH_TODO}/...")
+            # overwrite=True ensures we always test the latest data
+            cur.execute(f"PUT file://{file_path_local} @{STAGE_NAME}/{PATH_TODO}/ OVERWRITE=TRUE")
 
-            # A. Upload to 'not_processed' folder in Stage
-            print(f"   1. Uploading to @{TARGET_STAGE}/not_processed/")
-            # Windows/Linux path handling for PUT command
-            # AUTO_COMPRESS=FALSE because files are already .gz from Source export
-            put_sql = f"PUT file://{filepath} @{TARGET_STAGE}/not_processed/ AUTO_COMPRESS=FALSE OVERWRITE=TRUE"
-            cur.execute(put_sql)
-
-            # B. Load into Target Table
-            print(f"   2. Loading into Table...")
+            # ---------------------------------------------------------
+            # STEP 2: LOAD DATA (Strict Mode)
+            # ---------------------------------------------------------
+            print(f"   ⤵️ Loading into {table}...")
+            
+            # Using ABORT_STATEMENT ensures the script FAILS if data is bad.
+            # Using NULL_IF handles the \N issue.
+            copy_sql = f"""
+                COPY INTO "{table}" 
+                FROM @{STAGE_NAME}/{PATH_TODO}/{filename}
+                FILE_FORMAT = (
+                    TYPE='CSV' 
+                    SKIP_HEADER=1 
+                    FIELD_OPTIONALLY_ENCLOSED_BY='"'
+                    NULL_IF=('NULL', 'nan', '\\\\N')
+                )
+                ON_ERROR = 'CONTINUE' 
+                PURGE = FALSE
+            """
+            
             try:
-                copy_sql = f"""
-                    COPY INTO "{table_name}" 
-                    FROM @{TARGET_STAGE}/not_processed/{filename}
-                    FILE_FORMAT = (
-                        TYPE='CSV' 
-                        SKIP_HEADER=1 
-                        FIELD_OPTIONALLY_ENCLOSED_BY='"'
-                        NULL_IF=('NULL', 'nan')
-                    )
-                    ON_ERROR = 'CONTINUE'
-                """
                 cur.execute(copy_sql)
-                print("      ✅ Load Success")
+                # If we get here, the load was 100% successful
+                print(f"      ✅ Load Successful.")
                 
-                # C. "Move" to Processed (Remove from not_processed)
-                # Since we cannot effectively 'move' files between internal stage folders instantly,
-                # removing it from 'not_processed' confirms it has been consumed.
-                print(f"   3. Cleaning up 'not_processed'...")
-                cur.execute(f"REMOVE @{TARGET_STAGE}/not_processed/{filename}")
+                # -----------------------------------------------------
+                # STEP 3: MOVE TO 'PROCESSED' (Archive)
+                # -----------------------------------------------------
+                # Since Snowflake doesn't have a simple "MV" command for internal stages,
+                # we re-upload to the 'processed' folder and remove the old one.
+                # This is safe because the file is still on the GitHub Runner.
                 
-            except Exception as e:
-                print(f"      ❌ Load Failed: {e}")
+                print(f"   🚚 Moving to @{STAGE_NAME}/{PATH_DONE}/...")
+                cur.execute(f"PUT file://{file_path_local} @{STAGE_NAME}/{PATH_DONE}/ OVERWRITE=TRUE")
+                cur.execute(f"REMOVE @{STAGE_NAME}/{PATH_TODO}/{filename}")
+                
+            except snowflake.connector.errors.ProgrammingError as e:
+                print(f"      ❌ LOAD FAILED for {table}")
+                print(f"      📄 File remains in: @{STAGE_NAME}/{PATH_TODO}/{filename}")
+                # RE-RAISE the error to stop the pipeline immediately
+                raise e
 
+    except Exception as e:
+        print(f"\n❌ CRITICAL ERROR: {e}")
+        exit(1) # Force GitHub Action to turn Red
+        
     finally:
         conn.close()
-        print("\n✨ Data Load Complete")
+        print("\n✨ Data Load Process Finished")
 
 if __name__ == "__main__":
     main()
