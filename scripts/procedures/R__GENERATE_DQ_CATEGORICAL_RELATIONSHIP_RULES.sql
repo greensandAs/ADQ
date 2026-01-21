@@ -5,7 +5,7 @@ CREATE OR REPLACE PROCEDURE "GENERATE_DQ_CATEGORICAL_RELATIONSHIP_RULES"("DATASE
 RETURNS VARIANT
 LANGUAGE PYTHON
 RUNTIME_VERSION = '3.10'
-PACKAGES = ('pandas','scipy','numpy','snowflake-snowpark-python')
+PACKAGES = ('pandas', 'scipy', 'numpy', 'snowflake-snowpark-python')
 HANDLER = 'generate_dq_categorical_relationship_rules_handler'
 EXECUTE AS CALLER
 AS '

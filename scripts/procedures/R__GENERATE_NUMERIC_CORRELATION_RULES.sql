@@ -5,7 +5,7 @@ CREATE OR REPLACE PROCEDURE "GENERATE_NUMERIC_CORRELATION_RULES"("DATASET_NAME" 
 RETURNS VARIANT
 LANGUAGE PYTHON
 RUNTIME_VERSION = '3.11'
-PACKAGES = ('pandas','numpy','snowflake-snowpark-python')
+PACKAGES = ('pandas', 'numpy', 'snowflake-snowpark-python')
 HANDLER = 'generate_numeric_correlation_rules_handler'
 EXECUTE AS OWNER
 AS '';;
