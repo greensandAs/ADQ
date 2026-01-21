@@ -64,6 +64,35 @@ This architecture follows a **"GitOps"** model. The Source Database is the "Trut
 2. **Repository Storage:** These assets are cleaned, formatted (linted), and committed to your **GitHub Repository**.  
 3. **Target Deployment:** GitHub Actions triggers new Python scripts to push these assets to the **Target Snowflake Account**.
 
+
+```mermaid
+flowchart LR
+    subgraph Source_Env ["Source Environment"]
+        A["Source Snowflake Account"]
+    end
+
+    subgraph CICD_Hub ["CI/CD Hub"]
+        direction TB
+        B["GitHub Actions Runner"]
+        C["GitHub Repository (Git)"]
+    end
+
+    subgraph Target_Env ["Target Environment"]
+        D["Target Snowflake Account"]
+    end
+
+    %% Flows
+    A -- "1. Extract DDL & Data" --> B
+    B -- "2. Clean, Lint & Commit" --> C
+    C -- "3. Checkout Assets" --> B
+    B -- "4. Deploy DDL & Load Data" --> D
+
+    style A fill:#005d87,stroke:#fff,color:#fff
+    style D fill:#005d87,stroke:#fff,color:#fff
+    style B fill:#2088ff,stroke:#fff,color:#fff
+    style C fill:#f05032,stroke:#fff,color:#fff
+```
+
 ---
 
 ### **Detailed Code Explanation**
@@ -183,6 +212,7 @@ The pipeline is split into 4 modular workflows. You must run them in this specif
 | **3** | **3\. Deploy DDL** | Click 'Run Workflow' | Pushes the DDL to the Target. **Auto-bootstraps** the database if it doesn't exist. |
 | **4** | **4\. Load Data** | Click 'Run Workflow' | Uploads the CSVs to Target and loads them. Moves successful files to a processed stage folder. |
 
+
 ---
 
 ### **5.4. Verification**
@@ -249,32 +279,3 @@ Authored by \[Aslam M\]
 
 Connect with me on LinkedIn: \[[Aslam M-LinkedIn](https://www.linkedin.com/in/aslam-m-313057248/)\]
 
-### High-Level Architecture
-
-``` mermaid
-flowchart LR
-    subgraph Source Environment
-        A[Source Snowflake\nAccount]
-    end
-
-    subgraph CI/CD Hub
-        direction TB
-        B[GitHub Actions\nRunner]
-        C[GitHub Repository\n(Git)]
-    end
-
-    subgraph Target Environment
-        D[Target Snowflake\nAccount]
-    end
-
-    %% Flows
-    A -- 1. Extract DDL & Data --> B
-    B -- 2. Clean, Lint & Commit --> C
-    C -- 3. Checkout Assets --> B
-    B -- 4. Deploy DDL & Load Data --> D
-
-    style A fill:#005d87,stroke:#fff,color:#fff
-    style D fill:#005d87,stroke:#fff,color:#fff
-    style B fill:#2088ff,stroke:#fff,color:#fff
-    style C fill:#f05032,stroke:#fff,color:#fff
-```
