@@ -1,5 +1,0 @@
-USE DATABASE {{ snowflake_database }};
-USE SCHEMA {{ snowflake_schema }};
-
-ALTER TABLE DQ_DATASET_COLUMN
-ADD COLUMN JUSTIFICATION_NEW ARRAY;
