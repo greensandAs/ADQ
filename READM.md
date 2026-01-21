@@ -1,4 +1,4 @@
-# **❄️  Snowflake Migration Toolkit**
+# **❄️  Snowflake Migration Toolkit ❄️**
 
 ### ***Automated "Lift-and-Shift" for Agile Data Engineering***
 
@@ -257,7 +257,7 @@ sequenceDiagram
 
 ---
 
-## **6\. How to Handle Errors (Troubleshooting)**
+## **6\. Issue Faced (Troubleshooting)**
 
 ### **🔴 Error: "Object does not exist" during Deployment**
 
