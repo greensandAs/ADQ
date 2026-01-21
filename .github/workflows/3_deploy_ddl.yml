@@ -32,8 +32,11 @@ jobs:
           SNOWFLAKE_DATABASE: ${{ vars.TARGET_DATABASE }}
           SNOWFLAKE_SCHEMA: ${{ vars.TARGET_SCHEMA }}
         run: |
+        
+          echo "Deploying to Database: $DB_NAME"
           # The -f flag points to the folder containing your generated SQL files
-          schemachange -f scripts/ddl \
+          schemachange deploy \
+            -f scripts/ddl \
             -a $SNOWFLAKE_ACCOUNT \
             -u $SNOWFLAKE_USER \
             -r $SNOWFLAKE_ROLE \
