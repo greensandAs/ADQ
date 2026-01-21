@@ -212,6 +212,40 @@ The pipeline is split into 4 modular workflows. You must run them in this specif
 | **3** | **3\. Deploy DDL** | Click 'Run Workflow' | Pushes the DDL to the Target. **Auto-bootstraps** the database if it doesn't exist. |
 | **4** | **4\. Load Data** | Click 'Run Workflow' | Uploads the CSVs to Target and loads them. Moves successful files to a processed stage folder. |
 
+```mermaid
+sequenceDiagram
+    actor User
+    participant GHA as GitHub Actions
+    participant Source as Source Snowflake
+    participant Repo as GitHub Repo
+    participant Target as Target Snowflake
+
+    note over GHA, Repo: Pipeline 1 & 2: Extraction & Commit
+
+    User->>GHA: Trigger "1. Extract DDL"
+    GHA->>Source: Run mig_ddl.py (GET_DDL)
+    Source-->>GHA: Return Raw SQL
+    GHA->>GHA: Clean & Lint (SQLFluff)
+    GHA->>Repo: Commit Cleaned DDL scripts
+
+    User->>GHA: Trigger "2. Extract Data"
+    GHA->>Source: Run mig_dml_export.py (COPY INTO @stage)
+    GHA->>Source: GET files (Download CSVs)
+    GHA->>Repo: Commit Data Exports (CSVs)
+
+    note over GHA, Target: Pipeline 3 & 4: Deployment & Loading
+
+    User->>GHA: Trigger "3. Deploy DDL"
+    GHA->>Repo: Checkout DDL scripts
+    GHA->>Target: Bootstrap (CREATE DB/SCHEMA IF NOT EXISTS)
+    GHA->>Target: Run schemachange (Deploy SQL objects)
+
+    User->>GHA: Trigger "4. Load Data"
+    GHA->>Repo: Checkout CSV files
+    GHA->>Target: Run mig_load_data.py (PUT files to Stage)
+    GHA->>Target: COPY INTO Tables (Strict Mode)
+    Target-->>GHA: Load Success/Failure
+```
 
 ---
 
